@@ -55,12 +55,15 @@ pipeline {
                 script {
                     def SERVER_IP = ""
 
-                    withCredentials([string(credentialsId: 'dev_ip', variable: 'DEV_IP'),
-                                     string(credentialsId: 'qa_ip', variable: 'QA_IP'),
-                                     string(credentialsId: 'prod-ip', variable: 'PROD_IP'),
-                                     usernamePassword(credentialsId: 'DOCKERHUB_CREDENTIALS', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')
-                                     ]) {
-                                     
+                    // Inject ALL credentials required for deployment
+                    withCredentials([
+                        string(credentialsId: 'dev_ip', variable: 'DEV_IP'),
+                        string(credentialsId: 'qa_ip', variable: 'QA_IP'),
+                        string(credentialsId: 'prod-ip', variable: 'PROD_IP'),
+                        usernamePassword(credentialsId: 'DOCKERHUB_CREDENTIALS', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')
+                    ]) {
+
+                        // Determine server IP based on branch
                         if (env.BRANCH_NAME == 'dev') {
                             SERVER_IP = DEV_IP
                         } else if (env.BRANCH_NAME == 'qa') {
@@ -68,20 +71,20 @@ pipeline {
                         } else if (env.BRANCH_NAME == 'prod') {
                             SERVER_IP = PROD_IP
                         }
-                    }
 
-                    sh """
-                    ssh -i ~/.ssh/key123.pem ubuntu@${SERVER_IP} "
-                        docker login -u ${DOCKER_USER} -p ${DOCKER_PASS}
-                        docker pull ${IMAGE_NAME}:${env.BRANCH_NAME}
-                        docker stop react-app || true
-                        docker rm react-app || true
-                        docker run -d -p 80:80 --name react-app ${IMAGE_NAME}:${env.BRANCH_NAME}
-                    "
-                    """
-                }
-            }
+                        sh """
+                        ssh -i ~/.ssh/key123.pem ubuntu@${SERVER_IP} \"
+                            echo '${DOCKER_PASS}' | docker login -u '${DOCKER_USER}' --password-stdin
+                            docker pull ${IMAGE_NAME}:${env.BRANCH_NAME}
+                            docker stop react-app || true
+                            docker rm react-app || true
+                            docker run -d -p 80:80 --name react-app ${IMAGE_NAME}:${env.BRANCH_NAME}
+                        \"
+                        """
+                    }
         }
-    
+    }
+}
+
     }
 }

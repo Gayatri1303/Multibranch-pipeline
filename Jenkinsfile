@@ -58,7 +58,7 @@ pipeline {
                     withCredentials([string(credentialsId: 'dev_ip', variable: 'DEV_IP'),
                                      string(credentialsId: 'qa_ip', variable: 'QA_IP'),
                                      string(credentialsId: 'prod-ip', variable: 'PROD_IP')]) {
-                        
+                                     usernamePassword(credentialsId: 'DOCKERHUB_CREDENTIALS', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')
                         if (env.BRANCH_NAME == 'dev') {
                             SERVER_IP = DEV_IP
                         } else if (env.BRANCH_NAME == 'qa') {

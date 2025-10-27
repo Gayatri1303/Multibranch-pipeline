@@ -3,9 +3,9 @@ pipeline {
 
     environment {
         ARTIFACT_DIR = 'build'
-        DOCKERHUB_CREDENTIALS = 'dockerhub-creds'
         IMAGE_NAME = 'gayatri491/react-app'
         BRANCH_TAG = "${env.BRANCH_NAME}"
+
     }
 
     stages {
@@ -17,7 +17,7 @@ pipeline {
 
         stage('Build React App') {
             steps {
-                sh "npm run build"
+                sh "CI=false npm run build"
             }
         }
 
@@ -29,9 +29,15 @@ pipeline {
             }
         }
 
+        stage('Archive Artifact') {
+            steps {
+                archiveArtifacts artifacts: "${ARTIFACT_DIR}/**", fingerprint: true
+            }
+        }
+
         stage('Push Docker Image') {
             steps {
-                withCredentials([usernamePassword(credentialsId: DOCKERHUB_CREDENTIALS, usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                withCredentials([usernamePassword(credentialsId: 'DOCKERHUB_CREDENTIALS', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
                     sh """
                     echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
                     docker push ${IMAGE_NAME}:${BRANCH_TAG}
@@ -40,31 +46,45 @@ pipeline {
             }
         }
 
+        
         stage('Deploy to Environment') {
             when {
                 branch pattern: "dev|qa|prod", comparator: "REGEXP"
             }
             steps {
                 script {
-                    def server_ip = ""
-                    if (env.BRANCH_NAME == 'dev') {
-                        server_ip = env.dev_ip
-                    } else if (env.BRANCH_NAME == 'qa') {
-                        server_ip = env.qa_ip
-                    } else if (env.BRANCH_NAME == 'prod') {
-                        server_ip = env.prod_ip
-                    }
+                    def SERVER_IP = ""
 
-                    sh """
-                    ssh -i key123.pem ubuntu@${server_ip} '
-                        docker pull ${IMAGE_NAME}:${BRANCH_TAG}
-                        docker stop react-app || true
-                        docker rm react-app || true
-                        docker run -d -p 80:80 --name react-app ${IMAGE_NAME}:${BRANCH_TAG}
-                    '
-                    """
-                }
-            }
+                    
+                    withCredentials([
+                        string(credentialsId: 'dev_ip', variable: 'DEV_IP'),
+                        string(credentialsId: 'qa_ip', variable: 'QA_IP'),
+                        string(credentialsId: 'prod-ip', variable: 'PROD_IP'),
+                        usernamePassword(credentialsId: 'DOCKERHUB_CREDENTIALS', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')
+                    ]) {
+
+                        
+                        if (env.BRANCH_NAME == 'dev') {
+                            SERVER_IP = DEV_IP
+                        } else if (env.BRANCH_NAME == 'qa') {
+                            SERVER_IP = QA_IP
+                        } else if (env.BRANCH_NAME == 'prod') {
+                            SERVER_IP = PROD_IP
+                        }
+
+                        sh """
+                        ssh -i ~/.ssh/key123.pem ubuntu@${SERVER_IP} \"
+                            echo '${DOCKER_PASS}' | docker login -u '${DOCKER_USER}' --password-stdin
+                            docker pull ${IMAGE_NAME}:${env.BRANCH_NAME}
+                            docker stop react-app || true
+                            docker rm react-app || true
+                            docker run -d -p 80:80 --name react-app ${IMAGE_NAME}:${env.BRANCH_NAME}
+                        \"
+                        """
+                    }
         }
+    }
+}
+
     }
 }

@@ -1,4 +1,5 @@
-pipeline {
+pipeline 
+{
     agent { label 'agent2' }  
 
     environment {
@@ -41,7 +42,7 @@ pipeline {
                     if (env.BRANCH_NAME == 'dev') {
                         echo "Deploying to DEV environment..."
                         sh """
-                        # Example - update for your server
+                        
                         scp -r ${ARTIFACT_DIR}/* ubuntu@dev-server-ip:/var/www/dev-app
                         """
                     } else if (env.BRANCH_NAME == 'qa') {

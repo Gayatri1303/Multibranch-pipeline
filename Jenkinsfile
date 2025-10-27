@@ -3,7 +3,6 @@ pipeline {
 
     environment {
         ARTIFACT_DIR = 'build'
-        
         IMAGE_NAME = 'gayatri491/react-app'
         BRANCH_TAG = "${env.BRANCH_NAME}"
     }
@@ -37,7 +36,7 @@ pipeline {
 
         stage('Push Docker Image') {
             steps {
-                withCredentials([usernamePassword(credentialsId: DOCKERHUB_CREDENTIALS, usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                withCredentials([usernamePassword(credentialsId: 'DOCKERHUB_CREDENTIALS', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
                     sh """
                     echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
                     docker push ${IMAGE_NAME}:${BRANCH_TAG}
@@ -62,7 +61,7 @@ pipeline {
                     }
 
                     sh """
-                    ssh -i key123.pem ubuntu@${server_ip} '
+                    ssh -i ~/.ssh/key123.pem ubuntu@${server_ip} '
                         docker pull ${IMAGE_NAME}:${BRANCH_TAG}
                         docker stop react-app || true
                         docker rm react-app || true

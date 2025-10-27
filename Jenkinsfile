@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         ARTIFACT_DIR = 'build'
-        DOCKERHUB_CREDENTIALS = 'dockerhub-creds'
+        
         IMAGE_NAME = 'gayatri491/react-app'
         BRANCH_TAG = "${env.BRANCH_NAME}"
     }
@@ -26,6 +26,12 @@ pipeline {
                 script {
                     sh "docker build -t ${IMAGE_NAME}:${BRANCH_TAG} ."
                 }
+            }
+        }
+
+        stage('Archive Artifact') {
+            steps {
+                archiveArtifacts artifacts: "${ARTIFACT_DIR}/**", fingerprint: true
             }
         }
 

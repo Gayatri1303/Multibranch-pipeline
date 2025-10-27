@@ -1,53 +1,71 @@
 pipeline {
-    agent none
+    agent { label 'agent2' }  
 
-    stages{
-        stage("Test"){
-            agent {
-                docker {
-                    image 'node:lts-alpine'
-                    args '-u root:root'
-                }
-            }
-            steps{
-                sh "chmod +x -R ${env.WORKSPACE}"
-                sh './scripts/test.sh'
-            }
-        }
-        stage("Build"){
-            agent {
-                docker {
-                    image 'node:lts-alpine'
-                    args '-u root:root'
-                }
-            }
-            steps{
-                sh "chmod +x -R ${env.WORKSPACE}"
-                sh "npm install"
-                sh "./scripts/deliver-for-development.sh"
+    environment {
+        NODE_HOME = tool 'node16'  
+        ARTIFACT_DIR = 'build'
+    }
+
+    stages {
+
+        stage('Install Dependencies') {
+            steps {
+                sh """
+                export PATH=\$NODE_HOME/bin:\$PATH
+                npm install
+                """
             }
         }
-        stage("Deliver for Development"){
-            agent any
+
+        stage('Build React App') {
+            steps {
+                sh """
+                export PATH=\$NODE_HOME/bin:\$PATH
+                npm run build
+                """
+            }
+        }
+
+        stage('Archive Artifact') {
+            steps {
+                archiveArtifacts artifacts: "${ARTIFACT_DIR}/**", fingerprint: true
+            }
+        }
+
+        stage('Deploy to Environment') {
             when {
-                branch "development"
-            }
-            steps{
-                sh 'sudo rm -rf /var/www/jenkins-weather-app'
-                sh "sudo cp -r ${env.WORKSPACE}/build /var/www/jenkins-weather-app"
-                sh "sudo ls /var/www/jenkins-weather-app"
-                
-            }
-        }
-        stage("Deploy for Production"){
-            when {
-                branch "production"
+                branch pattern: "dev|qa|prod", comparator: "REGEXP"
             }
             steps {
-                sh './scripts/deploy-for-production.sh'
-                input message: 'Finished using the web site? (Click "Proceed" to continue)'
-                sh './scripts/kill.sh'
+                script {
+                    if (env.BRANCH_NAME == 'dev') {
+                        echo "Deploying to DEV environment..."
+                        sh """
+                        # Example - update for your server
+                        scp -r ${ARTIFACT_DIR}/* ubuntu@dev-server-ip:/var/www/dev-app
+                        """
+                    } else if (env.BRANCH_NAME == 'qa') {
+                        echo "Deploying to QA environment..."
+                        sh """
+                        scp -r ${ARTIFACT_DIR}/* ubuntu@qa-server-ip:/var/www/qa-app
+                        """
+                    } else if (env.BRANCH_NAME == 'prod') {
+                        echo "Deploying to PROD environment..."
+                        sh """
+                        scp -r ${ARTIFACT_DIR}/* ubuntu@prod-server-ip:/var/www/prod-app
+                        """
+                    }
+                }
             }
+        }
+    }
+
+    post {
+        success {
+            echo "Deployment completed successfully for branch: ${env.BRANCH_NAME}"
+        }
+        failure {
+            echo "Deployment failed for branch: ${env.BRANCH_NAME}"
         }
     }
 }
